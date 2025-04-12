@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spam or Ham?</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2rem;
+      background: #f9f9f9;
+    }
+    .container {
+      max-width: 500px;
+      margin: auto;
+      background: white;
+      padding: 2rem;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      border-radius: 10px;
+    }
+    textarea {
+      width: 100%;
+      height: 100px;
+      margin-bottom: 1rem;
+    }
+    .result {
+      font-weight: bold;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🕵️ Spam or Ham Classifier</h2>
+    <textarea id="inputText" placeholder="Type your message here..."></textarea>
+    <button onclick="predict()">Check Message</button>
+    <div class="result" id="resultArea"></div>
+  </div>
+
+  <script>
+    async function predict() {
+      const text = document.getElementById("inputText").value;
+      const resultArea = document.getElementById("resultArea");
+      resultArea.innerText = "Checking...";
+
+      try {
+        const res = await fetch("http://127.0.0.1:5002/predict", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text })
+        });
+
+        const data = await res.json();
+        resultArea.innerText = "The message is: " + data.prediction;
+      } catch (err) {
+        resultArea.innerText = "Error connecting to the server";
+        console.error(err);
+      }
+    }
+  </script>
+</body>
+</html>
