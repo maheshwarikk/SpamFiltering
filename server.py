@@ -7,37 +7,80 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from keras.models import load_model
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from gensim.models import Word2Vec
+import numpy as np
+import spacy
+from tqdm import tqdm
+import pandas as pd
+from spacy.lang.en.stop_words import STOP_WORDS as SPACY_STOPWORDS
+import tensorflow as tf
+from customFocalLoss import focal_loss_fixed, focal_loss
 app = Flask("server")
 
 
 app = Flask("server")
 CORS(app)
-# Load model
-model = load_model('my_model.keras')
+# When loading the model
+custom_objects = {
+    "Custom>focal_loss_fixed": focal_loss_fixed,
+    "Custom>focal_loss": focal_loss,
+    "Custom>focal_loss_fn": focal_loss(gamma=2.0, alpha=0.25)
+}
 
-# Load fitted TF-IDF vectorizer (must be saved during training)
-with open("vectorizer.pkl", "rb") as f:
-    vectorizer = pickle.load(f)
+w2v_modelNN = tf.keras.models.load_model('w2v_model.keras', custom_objects=custom_objects)
 
-# Load Spacy model once
-nlp = spacy.load("en_core_web_sm")
+w2v_model = Word2Vec.load("word2vec.model")
+# Load the IDF dictionary
+with open('idf_dict.pkl', 'rb') as f:
+    idf_dict = pickle.load(f)
 
-STOPWORDS = set(stopwords.words("english"))
 
-def text_preprocess(text):
-    text = text.lower()
-    text = contractions.fix(text)
-    text = re.sub(r'[^a-zA-Z\s!$]', " ", text)
-    text = re.sub(r'\s+', " ", text)
-    doc = nlp(text)
-    tokens = [token.lemma_.lower() for token in doc if token.lemma_.lower() not in STOPWORDS and not token.is_space and not token.is_punct]
-    return " ".join(tokens)
 
-def predict(text):
-    clean_text = text_preprocess(text)
-    input_vector = vectorizer.transform([clean_text]).toarray()
-    prediction = model.predict(input_vector)
-    predicted_class = (prediction > 0.5).astype(int)
+# Load spaCy with minimal components, and enable multi-core processing
+nlp = spacy.load("en_core_web_sm", disable=["ner", "parser","entity_linker"])
+
+# Custom preprocessing function that works on a list of texts
+def text_preprocess(texts, batch_size=1000, n_process=4):
+    cleaned = []
+
+    for doc in tqdm(nlp.pipe(texts, batch_size=batch_size, n_process=n_process)):
+        tokens = [
+            token.lemma_.lower() for token in doc
+            if token.lemma_ != "-PRON-"
+            and token.lemma_.lower() not in SPACY_STOPWORDS
+            and not token.is_space
+            and not token.is_punct
+        ]
+        cleaned.append(" ".join(tokens))
+    
+    return cleaned
+
+def predict(text, k=150):
+    # Ensure input is a single string
+    if not isinstance(text, str):
+        raise ValueError("Input should be a single string of text.")
+    
+    # Preprocess using your batch-friendly function
+    cleaned_text = text_preprocess([text])[0]  # returns list; take first element
+    tokens = cleaned_text.split()
+
+    # Compute TF-IDF weighted average Word2Vec vector
+    vecs = []
+    for word in tokens:
+        if word in w2v_model.wv:
+            weight = idf_dict.get(word, 1.0)
+            vecs.append(weight * w2v_model.wv[word])
+    
+    if vecs:
+        input_vector = np.mean(vecs, axis=0).reshape(1, -1)
+    else:
+        input_vector = np.zeros((1, k))  # fallback if no known tokens
+
+    # Predict
+    probability = w2v_modelNN.predict(input_vector)[0][0]
+    print(f"[DEBUG] Probability: {probability:.4f}")
+    
+    predicted_class = (probability > 0.5).astype(int)  # Threshold can be tuned
     return "spam" if predicted_class == 1 else "ham"
 
 @app.route('/')
