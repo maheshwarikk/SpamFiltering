@@ -15,7 +15,6 @@ import pandas as pd
 from spacy.lang.en.stop_words import STOP_WORDS as SPACY_STOPWORDS
 import tensorflow as tf
 from customFocalLoss import focal_loss_fixed, focal_loss
-app = Flask("server")
 
 
 app = Flask("server")
