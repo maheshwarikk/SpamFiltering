@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spam or Ham Classifier</title>
+  <!-- Load Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom styles to ensure the container is vertically centered on the screen */
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #e5e7eb;
+      /* Light gray background */
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="w-full max-w-lg p-8 bg-white rounded-xl shadow-2xl">
+    <h2 class="text-3xl font-bold text-gray-800 mb-6 text-center">
+      🕵️ Spam or Ham Classifier
+    </h2>
+
+    <!-- Input Area -->
+    <div class="mb-6">
+      <label for="inputText" class="block text-sm font-medium text-gray-700 mb-2">Enter your message:</label>
+      <textarea id="inputText" placeholder="Type your message here..."
+        class="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition duration-150 ease-in-out resize-none shadow-sm"
+        rows="5"></textarea>
+    </div>
+
+    <!-- Button -->
+    <button onclick="predict()"
+      class="w-full py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg shadow-md transition duration-150 ease-in-out transform hover:scale-[1.01] focus:outline-none focus:ring-4 focus:ring-indigo-500 focus:ring-opacity-50">
+      Check Message
+    </button>
+
+    <!-- Result Area -->
+    <div class="mt-8 p-4 rounded-lg text-center" id="resultCard">
+      <p class="text-gray-500" id="resultMessage">
+        Analysis result will appear here.
+      </p>
+    </div>
+  </div>
+
+  <script>
+    // *** IMPORTANT: REPLACE THIS PLACEHOLDER URL WITH YOUR ACTUAL RENDER URL ***
+    const API_URL = "https://spam-filter-api.onrender.com/predict";
+    // *************************************************************************
+
+    const inputText = document.getElementById("inputText");
+    const resultCard = document.getElementById("resultCard");
+    const resultMessage = document.getElementById("resultMessage");
+
+    function updateResult(text, type) {
+      resultMessage.textContent = text;
+      resultCard.className = "mt-8 p-4 rounded-lg text-center font-bold shadow-inner";
+
+      if (type === 'spam') {
+        resultCard.classList.add("bg-red-100", "text-red-700", "border", "border-red-300");
+        resultMessage.innerHTML = "🚨 Classification: <span class='uppercase'>" + text + "</span> 🚨";
+      } else if (type === 'ham') {
+        resultCard.classList.add("bg-green-100", "text-green-700", "border", "border-green-300");
+        resultMessage.innerHTML = "✅ Classification: <span class='uppercase'>" + text + "</span> ✅";
+      } else {
+        resultCard.classList.add("bg-yellow-100", "text-yellow-700", "border", "border-yellow-300");
+      }
+    }
+
+    async function predict() {
+      const text = inputText.value.trim();
+      if (!text) {
+        updateResult("Please enter a message.", "warning");
+        return;
+      }
+
+      updateResult("Checking the API...", "checking");
+
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ text: text })
+        });
+
+        if (!res.ok) {
+          throw new Error(`API returned status ${res.status}`);
+        }
+
+        const data = await res.json();
+        const prediction = data.prediction ? data.prediction.toLowerCase() : 'unknown';
+
+        if (prediction === 'spam') {
+          updateResult(prediction, 'spam');
+        } else if (prediction === 'ham') {
+          updateResult(prediction, 'ham');
+        } else {
+          updateResult(`API returned unknown prediction: ${data.prediction}`, "warning");
+        }
+
+      } catch (err) {
+        updateResult("Error connecting to the server. Check console for details.", "error");
+        console.error("Fetch Error:", err);
+      }
+    }
+  </script>
+</body>
+
+</html>
