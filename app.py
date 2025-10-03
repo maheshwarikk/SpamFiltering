@@ -21,7 +21,7 @@ from customFocalLoss import focal_loss_fixed, focal_loss
 # --- GLOBAL APP SETUP ---
 # Renamed from "server" to standard __name__ for Gunicorn compatibility
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 
 # --- ARTIFACTS LOADING (LOADED ONCE ON STARTUP) ---
